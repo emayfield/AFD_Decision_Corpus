@@ -1,7 +1,7 @@
+*.csv
 afd_2019_randomized*
 cached_influences*
 cscw_output_*
 cscw_session_*
 *.pyc
 glove.6B*
-*.csv
