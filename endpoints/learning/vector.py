@@ -176,7 +176,7 @@ class VectorEndpoint:
     Returns: 201, vector IDs (list) created within this call.
         or   500, None if something went wrong.
     """
-    def post_all_x(self, instance_id, multiply=True):
+    def post_all_x(self, instance_id, multiply=False):
         try:
             vector_ids = []
             code, original_contrib_ids = self.server.instances.get_contribution_ids(instance_id)

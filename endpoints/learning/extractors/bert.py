@@ -1,9 +1,53 @@
-from bert_serving.client import BertClient
+
 import time
+import torch
 from endpoints.helpers.cache import lookup, store
 import numpy as np
 import json
+import os
 import math
+from pytorch_transformers import BertTokenizer, BertModel, BertForMaskedLM
+
+def import_bert_cache():
+    cachepath = os.path.join("..","cache","bert_library")
+    influence_cache = {}
+    if (os.path.exists(cachepath)):
+        categories = os.listdir(cachepath)
+        for cat in categories:
+            print(cat)
+            if not os.path.isfile(cat):
+                catpath = os.path.join(cachepath, cat)
+                if os.path.exists(catpath):
+                    subcat = os.listdir(catpath)
+                    for sub in subcat:
+                        subcatpath = os.path.join(catpath, sub)
+                        if os.path.isfile(subcatpath) and "DS_Store" not in sub:
+                            print(subcatpath)
+                            cache_file = open(subcatpath, "r")
+                            cache_line = cache_file.readline()
+                            old_cache_line = None
+                            line_type = 'content'
+                            current_key = None
+                            if len(cache_line) > 0:
+                                current_key = int(cache_line)
+                            while current_key is not None and cache_line != old_cache_line:
+                                old_cache_line = cache_line
+                                cache_line = cache_file.readline().strip()
+                                if line_type == 'content':
+                                    if len(cache_line) > 0:
+                                        cache_json = json.loads(cache_line)
+                                        influence_cache[current_key] = cache_json
+                                        if current_key % 100 == 0:
+                                            print("Keyed {}".format(current_key))
+                                    line_type = 'blank'
+                                elif line_type == 'key':
+                                    if len(cache_line) > 0:
+                                        current_key = int(cache_line)
+                                    line_type = 'content'
+                                elif line_type == 'blank':
+                                    line_type = 'key'
+    return influence_cache  
+
 
 class BertEndpoint:
 
@@ -12,18 +56,41 @@ class BertEndpoint:
     f1 = 0
     f2 = 0
     f3 = 0
-    cache_path = None
+    cache_path = "../cache"
 
-    function_key = ["bert"]
+    function_key = ["bert_library"]
 
     def __init__(self, server):
         self.server = server
         self.dimensions = 768
+        transformer_type = 'bert-base-uncased'
+        self.tokenizer = BertTokenizer.from_pretrained(transformer_type)
+        self.model = BertModel.from_pretrained(transformer_type)
+        self.model.eval()
 
-        if BertEndpoint.bert is None:
-            BertEndpoint.bert = BertClient()
-            BertEndpoint.cache_path = open("cachepath","r").read().strip()
-            
+    def preprocess(self, text):
+        modified_text = self.tokenizer.tokenize(text)
+        if len(modified_text) > 510:
+            modified_text = modified_text[0:510]
+        modified_array = ['[CLS]'] + modified_text + ['[SEP]']
+        indexed_tokens = self.tokenizer.convert_tokens_to_ids(modified_array)
+
+        segments_ids = [0]*len(modified_array)
+
+        # Convert inputs to PyTorch tensors
+        tokens_tensor = torch.tensor([indexed_tokens])
+        segments_tensors = torch.tensor([segments_ids])
+        return tokens_tensor, segments_tensors
+
+    def library_encode(self, text):
+        tokens_tensor, segments_tensors = self.preprocess(text)
+        with torch.no_grad():
+            outputs = self.model(tokens_tensor, token_type_ids=segments_tensors)
+            encoded_layers = outputs[0]
+
+        # We have encoded our input sequence in a FloatTensor of shape (batch size, sequence length, model hidden dimension)
+        return encoded_layers[0][0]
+                
     
     def feature_names(self):
         return 200, ["D{}".format(i) for i in range(self.dimensions)]
@@ -38,6 +105,8 @@ class BertEndpoint:
         else:
             return None
 
+
+
     def extract_features(self, instance_id, vote_timestamp, contrib_ids=None):
         try:
             code, discussion_id = self.server.instances.get_discussion_id(instance_id)
@@ -49,7 +118,6 @@ class BertEndpoint:
             for contrib_id in contrib_ids:
                 code, contrib_text = self.server.util.get_text(contrib_id)
                 code, contrib_timestamp = self.server.util.get_timestamp(contrib_id)
-
                 log_tokens = 0
                 if contrib_text is not None and len(contrib_text.split()) > 0:
                     log_tokens = math.log(len(contrib_text.split()))
@@ -63,12 +131,11 @@ class BertEndpoint:
                     vectors.append(encodes)
                     logs.append(log_tokens)
                 else:
-
                     if contrib_text is not None:
                         s1 = time.time()
                         to_bert = contrib_text.strip()
                         if len(to_bert) > 0:
-                            encodes = BertEndpoint.bert.encode([to_bert])[0].tolist()
+                            encodes = self.library_encode(to_bert).tolist()
                             store(BertEndpoint.cache_path, BertEndpoint.function_key, contrib_id, json.dumps(encodes))
                             vectors.append(encodes)
                             logs.append(log_tokens)
@@ -105,3 +172,5 @@ class BertEndpoint:
             print(instance_id)
             print(e)
             return 500, None
+
+
