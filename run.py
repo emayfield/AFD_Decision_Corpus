@@ -3,7 +3,7 @@ from scratchpad import dry_run
 import time
 
 if __name__ == "__main__":
-    for i in range(5,20):
+    for i in range(0,20):
         config = {
             "extractors": ["TALLY", "BERT"],
             "normalized": 3,

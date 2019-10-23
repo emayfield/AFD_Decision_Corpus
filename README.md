@@ -11,13 +11,15 @@ This dataset is a labeled and structured JSON replica of all debates in Wikipedi
 * 1.0: https://drive.google.com/open?id=180rKdJeEOVTVanNwGd8dtbsdSg7zR536
     - This is the first full-fledged version of the corpus, used in our CSCW 2019 paper.
     - The github branch `cscw_checkpoint` contains a snapshot of code used for all CSCW 2019 results.
+    - The corpus has been moved into a single JSON file 
 
 * 0.1: https://drive.google.com/open?id=137CQIvN4mRRnWlUNpHgfnVxyfeR2ZE5t
-    - This is the preliminary version of the corpus, used in our NAACL 2019 workshop paper
+    - This is the preliminary version of the corpus, used in our NAACL 2019 workshop paper.
+    - The corpus is divided into 20 files each containing a stratified subset of 5% of discussions, or approximately 20,000 discussions in each data file. Each can be trained completely independently.
 
 # Data Format
 
-The corpus is divided into 20 files each containing a stratified subset of 5% of discussions, or approximately 20,000 discussions in each data file. Each of these subsets contains a single large JSON object with four top-level child elements: `Discussions`, `Users`, `Outcomes`, and `Contributions`. Each of the four, in turn, contains thousands of child elements of its own.
+Each of these subsets contains a single large JSON object with four top-level child elements: `Discussions`, `Users`, `Outcomes`, and `Contributions`. Each of the four, in turn, contains thousands of child elements of its own.
 
 Each subchild of these four top-level categories represents a single entity in the corpus. Each entity has a unique nine-digit ID. The schema for each entity type is as follows:
 
@@ -76,7 +78,19 @@ Each subchild of these four top-level categories represents a single entity in t
 # Publication History
 
 * Elijah Mayfield and Alan W Black. 2019. Analyzing Wikipedia Deletion Debates with a Group Decision-Making Forecast Model. *ACM Conference on Computer-Supported Collaborative Work (CSCW).* **Best Paper Honorable Mention.**
+    - **To replicate these results:**
+        1. Check out the `cscw_checkpoint` repository branch .
+        2. Create a new empty folder named `jsons` at the root directory of the project.
+        3. Download the 1.0 corpus file `afd_2019_full_policies.py` and save it to the `jsons` directory.
+        4. From the root directory, run the command `python3 cscw.py`. Different functions in this folder produce different statistics from the CSCW paper. When the documentation is insufficient, please contact the corpus authors for assistance.
+
 * Elijah Mayfield and Alan W Black. Stance Classification, Outcome Prediction, and Impact Assessment: NLP Tasks for Studying Group Decision-Making. *Workshop on Natural Language Processing for Computational Social Science at the North American Association for Computational Linguistics (NAACL)*.
+    - **To replicate these results:**
+        1. Check out the `cscw_checkpoint` repository branch.
+        2. Create a new empty folder named `jsons` at the root directory of the project
+        3. Download the twenty files in the 0.1 corpus and save them to the `jsons` directory. Each is under 100 MB.
+        4. From the root directory, run the command `python3 run.py`. By default this will train new models twenty times, one for each file. 
+        5. To train on only one subset: remove the for loop from `run.py` and change the value pointed at by the `source` key in the config dictionary to the file of your choice. Results in the workshop paper were calculated on subset 1. 
 
 
 
