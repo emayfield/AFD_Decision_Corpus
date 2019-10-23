@@ -21,9 +21,34 @@ The corpus is divided into 20 files each containing a stratified subset of 5% of
 
 Each subchild of these four top-level categories represents a single entity in the corpus. Each entity has a unique nine-digit ID. The schema for each entity type is as follows:
 
-* `Discussion` contain two values:
-    - ``ID`` is a nine-digit integer beginning with the digit `1`.
-    - ``Title`` is a string representing the name of the article being discussed, sometimes with additional appended information like *(second nomination)*.
+* Elements in `Discussion` contain two values:
+    - `ID` is a nine-digit integer beginning with the digit `1`.
+    - `Title` is a string representing the name of the article being discussed.
+        - Sometimes titles contain additional appended information like "*(second nomination)*". Future releases will move this to metadata.
+
+* Elements in `Users` contain two values:
+    - `ID` is a nine-digit integer beginning with the digit `2`.
+    - `Name` is a string representing the username of an editor. 
+        - In many cases, this is an IP address for unregistered users, in either IPv4 or IPv6 format. Future releases will mark unregistered users in metadata. 
+        - Some usernames are mildly garbled by signature formatting, though we have taken steps to alleviate this. Username cleaning will continue in future releases.
+
+* Elements in `Outcomes` contain seven values:
+    - `ID` is a nine-digit integer beginning with the digit `3`.
+    - `Parent` is an integer starting with `1`. This is used as a foreign key linking an outcome to a discussion ID.
+    - `User` is an integer starting with `2`. This is used as a foreign key linking an outcome to a user ID.
+    - `Timestamp` is an integer value representing the signature time that a discussion was closed by an administrator with a final outcome. This has been converted to UNIX timestamp format counting the seconds since January 1, 1970.
+    - `Raw` is the bold text from an administrator listing the actin item to take from a debate. 
+        - This usually falls into one of a very small number of labels, The most common are *Keep* and *Delete*.
+        - But there is a very long tail of rarely occuring strings and, in some cases, whole sentences of action items.
+    - `Label` is a string of normalized outcome labels that appear in the raw text, separated by spaces.
+        - The goal of this is to convert raw outcome texts into something more easily quantifiable, while acknowledging that 
+        - The most common four outcomes are *keep*, *delete*, *merge*, *redirect*, and the modifier *speedy*.
+        - Sometimes multiple outcome labels appear at once: *merge delete* for instance.  
+        - Heuristic rules in the source code determing how these strings are mapped to specific labels when calculating aggregate statistics. It's mostly a prioritized waterfall of keywords, attempting to merge decisions into "keep"-like and "delete"-like outcomes. For instance, *speedy delete* is merged in with *delete* when performing classification tasks.
+        - Also in the source code is a set of rules for converting to a 2-label case with only keep and delete outcomes. Whenever an outcome results in a page not being deleted, those rare outcomes are merged in with *keep*. 
+    - `Rationale` is the plaintext of the administrator's text explanation for the outcome that they chose. This can be empty, very short, or in some cases can be a whole paragraph of text.
+* 
+
 
 # Publication History
 
