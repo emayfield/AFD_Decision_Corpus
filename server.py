@@ -1,7 +1,10 @@
 import json
 import time
 import os
+import re
+import datetime
 import csv
+from collections import defaultdict
 from endpoints.data.discussion import DiscussionEndpoint
 from endpoints.data.user       import UserEndpoint
 from endpoints.data.outcome    import OutcomeEndpoint
@@ -9,7 +12,7 @@ from endpoints.data.vote       import VoteEndpoint
 from endpoints.data.comment    import CommentEndpoint
 from endpoints.data.nomination import NominationEndpoint
 from endpoints.helpers.utilities import UtilitiesEndpoint
-from endpoints.helpers.math      import MathEndpoint
+from endpoints.helpers.tally      import MathEndpoint
 from endpoints.helpers.analysis  import AnalysisEndpoint
 from endpoints.learning.instance   import InstanceEndpoint
 from endpoints.learning.vector     import VectorEndpoint
@@ -17,7 +20,7 @@ from endpoints.learning.corpus     import CorpusEndpoint
 from endpoints.learning.prediction import PredictionEndpoint
 from endpoints.learning.extractors.tally     import TallyEndpoint
 from endpoints.learning.extractors.embedding import EmbeddingEndpoint
-from endpoints.learning.extractors.bert      import BertEndpoint
+from endpoints.learning.extractors.bert      import BertEndpoint, import_bert_cache
 from endpoints.learning.extractors.bow       import BOWEndpoint
 
 class DebateServer():
@@ -56,71 +59,80 @@ class DebateServer():
             extractors.append(BOWEndpoint(self))
         if "BERT" in extractor_options:
             extractors.append(BertEndpoint(self))
-            self.import_bert_cache()
+            if len(DebateServer.influence_cache.keys()) == 0:
+                DebateServer.influence_cache = import_bert_cache()
         if "GLOVE" in extractor_options:
             extractors.append(EmbeddingEndpoint(self))
         self.extractors = extractors
         filename = config["source"]
         start = time.time()
-        self.import_corpus(filename)
+        print("Importing corpus")
+        self.import_corpus(filename, load_cached_influences=config["cached_influences"])
         end = time.time()
-        print("{} seconds elapsed while importing full corpus.".format((end-start)))
-
-    def import_bert_cache(self):
-        print("IMPORTING INFLUENCE")
-        if len(DebateServer.influence_cache.keys()) == 0:
-            print("INFLUENCE CACHE IS NONE")
-            cachepath = os.path.join("..","cache","bert_clean")
-            if (os.path.exists(cachepath)):
-                categories = os.listdir(cachepath)
-                for cat in categories:
-                    print(cat)
-                    if not os.path.isfile(cat):
-                        catpath = os.path.join(cachepath, cat)
-                        if os.path.exists(catpath):
-                            subcat = os.listdir(catpath)
-                            for sub in subcat:
-                                subcatpath = os.path.join(catpath, sub)
-                                if os.path.isfile(subcatpath) and "DS_Store" not in sub:
-                                    print(subcatpath)
-                                    cache_file = open(subcatpath, "r")
-                                    cache_line = cache_file.readline()
-                                    old_cache_line = None
-                                    line_type = 'content'
-                                    current_key = None
-                                    if len(cache_line) > 0:
-                                        current_key = int(cache_line)
-                                    while current_key is not None and cache_line != old_cache_line:
-                                        old_cache_line = cache_line
-                                        cache_line = cache_file.readline().strip()
-                                        if line_type == 'content':
-                                            if len(cache_line) > 0:
-                                                cache_json = json.loads(cache_line)
-                                                DebateServer.influence_cache[current_key] = cache_json
-                                                if current_key % 100 == 0:
-                                                    print("Keyed {}".format(current_key))
-                                            line_type = 'blank'
-                                        elif line_type == 'key':
-                                            if len(cache_line) > 0:
-                                                current_key = int(cache_line)
-                                            line_type = 'content'
-                                        elif line_type == 'blank':
-                                            line_type = 'key'
-                                            
+        print("{:2.2f} seconds elapsed while importing full corpus.".format((end-start)))
 
                                         
     def import_corpus(self, filename, min=0, max=500000, load_cached_influences=True):
-        corpus_file = open(filename, "r")
+        source_path = os.path.join("jsons")
+        dir_exists = os.path.exists(source_path)
+        if not dir_exists:
+            os.makedirs("jsons")
+        source_path = os.path.join("jsons", filename)
+        if not os.path.isfile(source_path):
+            print("Fetching corpus")
+            
+            if os.path.exists('jsons') and not os.path.isfile('jsons/afd_2019_full_policies.json'):
+                url = 'https://afdcorpus.s3.amazonaws.com/afd_2019_full_policies.json'
+
+                self.util.download_corpus(url)
+
+        else:
+            print("Corpus already downloaded locally.")
+        start = time.time()
+        corpus_file = open(source_path, "r")
         corpus_json = json.loads(corpus_file.read())
+        now = time.time()
+        print("{:2.2f} Loaded from JSON.".format((now-start)))
+        start = now
         count_notices = 0
         count_relists = 0
+
+        """
+        Post all the discussions, one at a time
+        """
         if "Discussions" in corpus_json.keys():
             for disc in corpus_json["Discussions"]:
                 if "Title" in disc.keys() and len(disc["Title"]) > 0:
                     code, discussion_id = self.discussions.post_discussion(disc)
-        if "Users" in corpus_json.keys():
-            for user in corpus_json["Users"]:
-                code, user_id = self.users.post_user(user)
+        now = time.time()
+        print("{:2.2f} Posted all discussions.".format((now-start)))
+        start = now
+
+        """
+        Load user demographic profiles
+        """
+#       Removed functionality for public release
+        if False:
+            user_demographics = self.import_user_demographics()
+
+            """
+            Post all the users, one at a time
+            """
+            if "Users" in corpus_json.keys():
+                for user in corpus_json["Users"]:
+                    code, user_id = self.users.post_user(user)
+                    username = user["Name"]
+                    if username in user_demographics.keys():
+                        self.users.put_demographics(user_id, user_demographics[username])
+
+
+        now = time.time()
+        print("{:2.2f} Posted all users.".format((now-start)))
+        start = now
+        
+        """
+        Post all the outcomes, one at a time
+        """
         if "Outcomes" in corpus_json.keys():
             for outcome in corpus_json["Outcomes"]:
                 code, new_outcome_id = self.outcomes.post_outcome(outcome)
@@ -128,70 +140,89 @@ class DebateServer():
                 if new_outcome_timestamp != -1:
                     code, outcome_discussion_id = self.outcomes.get_discussion_id(new_outcome_id)
                     self.discussions.put_contribution(outcome_discussion_id, new_outcome_id, new_outcome_timestamp)
+        now = time.time()
+        print("{:2.2f} Posted all outcomes.".format((now-start)))
+        start = now
+
+        """
+        Post all the votes and comments, one at a time
+        """
         if "Contributions" in corpus_json.keys():
             for contrib in corpus_json["Contributions"]:
                 if "ID" in contrib.keys():
                     this_id = contrib["ID"]
+
                     is_vote = self.util.is_vote(this_id)
-                    if is_vote:
-                        code, new_vote_id = self.votes.post_vote(contrib)
-                        code, new_vote_timestamp = self.votes.get_timestamp(new_vote_id)
-                        if new_vote_timestamp != -1:
-                            code, vote_discussion_id = self.votes.get_discussion_id(new_vote_id)
-                            self.discussions.put_contribution(vote_discussion_id, new_vote_id, new_vote_timestamp)
-                            
-                            # Define success
-                            normalized = self.config["normalized"]
-                            code, outcome_id = self.discussions.get_outcome_id(vote_discussion_id)
-                            code, outcome_label = self.outcomes.get_label(outcome_id, normalized=normalized)
-                            code, vote_label = self.votes.get_label(new_vote_id, normalized=normalized)
-                            success = (outcome_label == vote_label)
-                            self.votes.put_success(new_vote_id, success)
-
-                        code, new_user_id = self.votes.get_user_id(new_vote_id)
-                        if code == 200:
-                            code, new_user_id = self.users.put_contribution_id(new_user_id, new_vote_id, new_vote_timestamp)
-                    
                     is_comment = self.util.is_comment(this_id)
-                    if is_comment:
-                        code, new_comment_id = self.comments.post_comment(contrib)
-                        code, new_comment_timestamp = self.comments.get_timestamp(new_comment_id)
-                        if new_comment_timestamp != -1:
-                            code, comment_discussion_id = self.comments.get_discussion_id(new_comment_id)
-                            self.discussions.put_contribution(comment_discussion_id, new_comment_id, new_comment_timestamp)
-                        code, new_user_id = self.comments.get_user_id(new_comment_id)
-                        if code == 200:
-                            code, new_user_id = self.users.put_contribution_id(new_user_id, new_comment_id, new_comment_timestamp)
-                    
                     is_nomination = self.util.is_nomination(this_id)
-                    if is_nomination:
-                        code, new_nomination_id = self.nominations.post_nomination(contrib)
-                        code, new_nomination_timestamp = self.nominations.get_timestamp(new_nomination_id)
-                        if new_nomination_timestamp != -1:
-                            code, nomination_discussion_id = self.nominations.get_discussion_id(new_nomination_id)
-                            self.discussions.put_contribution(nomination_discussion_id, new_nomination_id, new_nomination_timestamp)
-                        code, new_user_id = self.nominations.get_user_id(new_nomination_id)
-                        if code == 200:
-                            code, new_user_id = self.users.put_contribution_id(new_user_id, new_nomination_id, new_nomination_timestamp)
 
+                    if is_vote:
+                        self.votes.post_vote(contrib)
+                    elif is_comment:
+                        self.comments.post_comment(contrib)
+                    elif is_nomination:
+                        self.nominations.post_nomination(contrib)
+
+                    code, this_timestamp = self.util.get_timestamp(this_id)
+                    code, this_user_id = self.util.get_user_id(this_id)
+                    if code == 200:
+                        self.users.put_contribution_id(this_user_id, this_id, this_timestamp)
+
+                    code, this_discussion_id = self.util.get_discussion_id(this_id)
+                    if code == 200:
+                        self.discussions.put_contribution(this_discussion_id, this_id, this_timestamp)
+                        if is_vote:
+                            normalized = self.config["normalized"]
+                            code, outcome_id = self.discussions.get_outcome_id(this_discussion_id)
+                            code, outcome_label = self.outcomes.get_label(outcome_id, normalized=normalized)
+                            code, vote_label = self.votes.get_label(this_id, normalized=normalized)
+                            success = (outcome_label == vote_label)
+                            self.votes.put_success(this_id, success)
+        now = time.time()
+        print("{:2.2f} Posted all votes and comments.".format((now-start)))
+        start = now
+
+        """
+        Post all the citations, one at a time.
+        """    
         if "Citations" in corpus_json.keys():
             for cite in corpus_json["Citations"]:
                 contrib_id = cite["ID"]
                 citations = cite["Citations"]
-                if self.util.is_vote(contrib_id):
-                    code, citations = self.votes.put_citations(contrib_id, citations)
-                if self.util.is_comment(contrib_id):
-                    code, citations = self.comments.put_citations(contrib_id, citations)
-                if self.util.is_nomination(contrib_id):
-                    code, citations = self.nominations.put_citations(contrib_id, citations)
+                code, citations = self.util.put_citations(contrib_id, citations)
+        now = time.time()
+        print("{:2.2f} Posted all citations.".format((now-start)))
+        start = now
 
+        """
+        Sort the user- and discussion-specific sublists of contribution by timestamp.
+        """
         self.users.put_sort_contributions()
         self.discussions.put_sort_contributions()
-        
+        now = time.time()
+        print("{:2.2f} Sorted contributions.".format((now-start)))
+        start = now
+
+        """
+        Define first-time users
+        """
+        code, users = self.users.get_all()
+        for user_id in users:
+            code, first_contrib_id = self.users.get_first_contribution(user_id)
+            code, disc_id = self.util.get_discussion_id(first_contrib_id)
+            self.users.put_first_discussion(user_id, disc_id)
+
+        now = time.time()
+        print("{:2.2f} Found first contributions.".format((now-start)))
+        start = now
+
+        """
+        Load preprocessed influence measures from disk.
+        """
         if load_cached_influences:
             influences_loaded = 0
             for i in range(1,21):
-                csv_in = open("cached_influences_offset_{}.csv".format(i), "r")
+                csv_in = open("forecast_shifts/cached_influences_offset_{}.csv".format(i), "r")
                 read = csv.reader(csv_in)
                 for row in read:
                     if len(row) >= 2 and len(row[1]) > 0:
@@ -202,6 +233,60 @@ class DebateServer():
                         if self.util.is_comment(contrib_id):
                             self.comments.put_influence(contrib_id, inf)
                             influences_loaded += 1
-            print("Loaded {} influences from cache.".format(influences_loaded))
+            now = time.time()
+            print("{:2.2f} Loaded influences from disk.".format((now-start)))
+            start = now
+
         code, discs = self.discussions.get_all()
-        print("{} discs found".format(len(discs)))
+        now = time.time()
+        print("{:2.2f} Loaded all discussions from disk.".format((now-start)))
+        start = now
+
+    def import_user_demographics(self):
+        demo_csv = csv.reader(open("afd_genders_tenures.csv", "r"))
+        row_number = 0
+        headers = {}
+        demographics = defaultdict(lambda: {})
+
+        genders_count = defaultdict(int)
+        timestamps_count = 0
+
+        date_format = "%Y-%m-%dT%H:%M:%SZ"
+        ipv4_match = "\d+\.\d+\.\d+\.\d+"
+        ipv6_match = "\w+:\w+:\w+:\w+:\w+:\w+:\w+:\w+"
+
+        for row in demo_csv:
+            if row_number == 0:
+                for i, cell in enumerate(row):
+                    print(cell)
+                    headers[cell] = i
+            else:
+                username_index = headers["username"]
+                username = row[username_index]
+                gender_index = headers["gender"]
+                gender = row[gender_index]
+                if "male" in gender:
+                    demographics[username]["gender"] = gender
+                    genders_count[gender] = genders_count[gender] + 1
+                signup_index = headers["signup"]
+                signup_string = row[signup_index].strip()
+                if len(signup_string) > 0:
+                    parse_object = datetime.datetime.strptime(signup_string, date_format)
+                    timestamp = parse_object.timestamp()
+                    demographics[username]["signup"] = timestamp
+                    timestamps_count += 1
+                elif re.match(ipv4_match, username) or re.match(ipv6_match, username):
+                    demographics[username]["signup"] = -1
+                
+                count_index = headers["editcount"]
+                count = row[count_index]
+                if len(count) > 0:
+                    count = int(count)
+                else:
+                    count = -1
+                demographics[username]["editcount"] = count
+
+            row_number += 1
+        return demographics
+
+        

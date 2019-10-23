@@ -8,16 +8,84 @@ import operator
 import os
 from server import DebateServer
 import numpy as np
+import csv
 
 def cscw(server, normalized):
     # We first analyze only conversations that have one 
     code, discussions = get_strict_discussions(server)
-    suffix = "first_order_activity"
+
+
+    suffix = "activity_and_index"
+
 #    analyze_by_user(server, discussions)
-    analyze_by_session(suffix, server, discussions, normalized, cutoff=10)
-#    print_label_counts_with_keys(suffix, server, discussions, normalized)
-#    get_examples(server, discussions, "notability (geographic features)")
+#    analyze_by_session(suffix, server, discussions, normalized, cutoff=10)
+    print_label_counts_with_keys(suffix, server, discussions, normalized)
+#    get_examples(server, discussions, "article size")
 #    aggregate_stats(server, discussions)
+    if False:
+        margins = {}
+        all_outcomes = {}
+        for disc_id in discussions:
+            if disc_id % 1000 == 0:
+                print(disc_id)
+            code, contribs = server.discussions.get_contributions(disc_id)
+            keeps = 0
+            deletes = 0
+            for c_id in contribs:
+                if server.util.is_vote(c_id):
+                    code, label = server.votes.get_label(c_id, normalized=normalized)
+                    if "Keep" in label:
+                        keeps += 1
+                    if "Delete" in label:
+                        deletes += 1
+            margin = deletes-keeps
+            code, outcome_id = server.discussions.get_outcome_id(disc_id)
+            code, outcome = server.outcomes.get_label(outcome_id, normalized=normalized)
+            if margin not in margins.keys():
+                margins[margin] = {}
+            if outcome not in margins[margin].keys():
+                all_outcomes[outcome] = 1
+                margins[margin][outcome] = 0
+            margins[margin][outcome] = margins[margin][outcome] + 1
+
+        margin_labels = sorted(list(margins.keys()))
+        outcome_labels = sorted(list(all_outcomes.keys()))
+        margin_out = open("outcomes_by_margins.csv", "w")
+        margin_csv = csv.writer(margin_out)
+        headers = ["margin"]
+        for o in outcome_labels:
+            headers.append(o)
+        margin_csv.writerow(headers)
+        for m in margin_labels:
+            row = [m]
+            for o in outcome_labels:
+                freq = 0
+                if o in margins[m].keys():
+                    freq = margins[m][o]
+                row.append(freq)
+            margin_csv.writerow(row)
+
+
+        code, users = server.users.get_all()
+        users_by_contrib_count = {}
+        print("Users: {}".format(len(users)))
+        for user_id in users:
+            code, user = server.users.get_by_id(user_id)
+            key = len(user.contributions)
+            if key not in users_by_contrib_count.keys():
+                print("Added key {}".format(key))
+                users_by_contrib_count[key] = []
+            users_by_contrib_count[key].append(user.name)
+        counts = sorted(list(users_by_contrib_count.keys()))
+        usernames_file = open("users_by_activity.csv", "w")
+        csv_out = csv.writer(usernames_file)
+        headers = ["username","contributions"]
+        csv_out.writerow(headers)
+        for c in counts:
+            for username in users_by_contrib_count[c]:
+                row = [username, c]
+                csv_out.writerow(row)
+
 
 def get_session_keys(details):
     activity = ""
@@ -149,7 +217,6 @@ def analyze_by_session(suffix, server, discussions, normalized, cutoff=99999):
 
 
 
-
 def analyze_by_user(server, discussions):
     code, user_ids = server.users.get_all()
     total_users = 0
@@ -172,17 +239,17 @@ def analyze_by_user(server, discussions):
 #            if disc_id in discussions:
 #                strict_contrib_disc_ids[disc_id] = 1
 #                strict_contrib_ids.append(c)
-        if len(strict_contrib_ids) > 0:
-            total_users += 1
-            total_contribs += len(strict_contrib_ids)
-            if len(strict_contrib_ids) <= 5:
-                five_or_fewer += 1
-                five_or_fewer_contribs += len(strict_contrib_ids)
-            if len(strict_contrib_ids) > max_contribs:
-                max_contribs = len(strict_contrib_ids)
-        ranked_users[u] = len(strict_contrib_ids)
-        if ( i % 1000 ) == 0:
-            print(i)
+    if len(strict_contrib_ids) > 0:
+        total_users += 1
+        total_contribs += len(strict_contrib_ids)
+        if len(strict_contrib_ids) <= 5:
+            five_or_fewer += 1
+            five_or_fewer_contribs += len(strict_contrib_ids)
+        if len(strict_contrib_ids) > max_contribs:
+            max_contribs = len(strict_contrib_ids)
+    ranked_users[u] = len(strict_contrib_ids)
+    if ( i % 1000 ) == 0:
+        print(i)
     
     ranked_list = sorted(ranked_users.items(), key=lambda x: x[1])
     for i in range(10):
@@ -201,21 +268,22 @@ def get_examples(server, discussions, key):
     for disc_id in discussions:
         code, title = server.discussions.get_title(disc_id)
         code, contribs = server.discussions.get_contributions(disc_id)
-        # Find by vote patterns
-        first_vote = contribs[0]
-        second_vote = contribs[1]
-        if server.util.is_vote(first_vote) and server.util.is_vote(second_vote):
-            first_label = server.votes.get_label(first_vote)
-            second_label = server.votes.get_label(second_vote)
-            if first_label=="Keep" and second_label == "Delete":
-                print(title)
-        # Find by citation
+
         if False:
-            for contrib_id in contribs:
-                if server.util.is_vote(contrib_id):
-                    code, cites = server.votes.get_citations(contrib_id)
-                    if key in cites:
-                        print(title)
+            # Find by vote patterns
+            first_vote = contribs[0]
+            second_vote = contribs[1]
+            if server.util.is_vote(first_vote) and server.util.is_vote(second_vote):
+                first_label = server.votes.get_label(first_vote)
+                second_label = server.votes.get_label(second_vote)
+                if first_label=="Keep" and second_label == "Delete":
+                    print(title)
+        # Find by citation
+        for contrib_id in contribs:
+            if server.util.is_vote(contrib_id):
+                code, cites = server.votes.get_citations(contrib_id)
+                if key in cites:
+                    print(title)
 """
 Utility function to define how to carve up votes for various tests.
 Change this to subdivide the corpus in interesting ways!
@@ -228,6 +296,7 @@ def get_key(details):
     citation = ""
     tenure = ""
     active = ""
+    index = ""
     wait = ""
     if "label" in details.keys():
         label = details["label"]
@@ -245,7 +314,17 @@ def get_key(details):
         active = details["active"]
     if "wait" in details.keys():
         wait = details["wait"]
+    if "index" in details.keys():
+        index = details["index"]
 #    keyA = "{}".format(order)
+
+    if len(str(active)) > 0 and len(str(index)) > 0:
+        if int(active) >= 10:
+            active = "Very Active"
+        if int(index) >= 10:
+            index = "Very Late"
+
+    keyA = "{} {}".format(label, active)
 
 #   For chronological sorting:
 #    keyA = "{} {}".format(label, year)
@@ -255,7 +334,7 @@ def get_key(details):
 #    keyA = "{} {}".format(label, tenure)
 
 #   For user-level sorting
-    keyA = user
+#    keyA = user
 
 #   For impact and success by citation per label
 #    keyA = ""
@@ -266,7 +345,7 @@ def get_key(details):
 
 #   For overall citation influence
 #    keyA = citation
-
+#    keyA = ["{} {}".format(label, c) for c in citation]
 #    keyA = "{} {}".format(citation, year)
 
 
@@ -380,21 +459,24 @@ def process_votes(server, timestamp_cutoffs, contrib_id, latest_year, ordinal, l
         vote_labels[v][contrib_id]["Influence"] = inf
 
         code, citations = server.votes.get_citations(contrib_id)
-        all_keys = {}
         if len(citations) == 0:
             citations.append("no citation present")
         
         
+        contrib_user_index = user_activity.index(contrib_id)
+        user_contrib_count = len(user_activity)
 #        for cite in citations:
         details = {
             "year":year,
             "order":ordinal,
             "user":username,
-#            "citation":cite,
+            "citation":citations,
             "tenure":tenure,
-            "active":user_activity,
+            "active":user_contrib_count,
+            "index":contrib_user_index,
             "label":v
         }
+        all_keys = {}
         keys = get_key(details)
         for key in keys:
             all_keys[key] = 1
@@ -408,6 +490,7 @@ def process_votes(server, timestamp_cutoffs, contrib_id, latest_year, ordinal, l
             keyed_votes[k][contrib_id]["Type"] = "vote"
             keyed_votes[k][contrib_id]["Success"] = succ
             keyed_votes[k][contrib_id]["Influence"] = inf
+            keyed_votes[k][contrib_id]["Order"] = ordinal
 
     return latest_year, latest_timestamp, vote_labels, keyed_votes
 
@@ -442,11 +525,15 @@ def process_comments(server, timestamp_cutoffs, contrib_id, latest_year, ordinal
         comment_labels["comment"][contrib_id]["Type"] = "comment"
 
 
+        contrib_user_index = user_activity.index(contrib_id)
+        user_contrib_count = len(user_activity)
+
         details = {
             "order":ordinal,
             "user":username,
             "tenure":tenure,
-            "active":user_activity,
+            "active":user_contrib_count,
+            "index":contrib_user_index,
             "year":year
         }
 
@@ -457,6 +544,7 @@ def process_comments(server, timestamp_cutoffs, contrib_id, latest_year, ordinal
             if contrib_id not in keyed_comments[k].keys():
                 keyed_comments[k][contrib_id] = {}
             keyed_comments[k][contrib_id]["Type"] = "comment"
+            keyed_comments[k][contrib_id]["Order"] = ordinal
     return latest_year, latest_timestamp, comment_labels, keyed_comments
 
 def process_outcomes(server, outcome_id, latest_year, outcome_labels, keyed_outcomes):
@@ -488,12 +576,13 @@ def process_outcomes(server, outcome_id, latest_year, outcome_labels, keyed_outc
     return keyed_outcomes
 
 def output_summary_map(writer, header, out_map, min_appearances = 1):
-    writer.writerow([header,"Count","Success","Influence"])
+    writer.writerow([header,"Count","Success","Influence","Order"])
     sorted_keys = sorted(list(out_map.keys()))
     for key in sorted_keys:
         count = 0
         avg_succ = 0
         avg_inf = 0
+        avg_order = 0
         if len(out_map[key].keys()) >= min_appearances:
             for contrib_id in out_map[key].keys():
                 if "Type" in out_map[key][contrib_id].keys():
@@ -502,10 +591,13 @@ def output_summary_map(writer, header, out_map, min_appearances = 1):
                     avg_succ += out_map[key][contrib_id]["Success"]
                 if "Influence" in out_map[key][contrib_id].keys():
                     avg_inf += out_map[key][contrib_id]["Influence"]
+                if "Order" in out_map[key][contrib_id].keys():
+                    avg_order += int(out_map[key][contrib_id]["Order"])
             avg_succ /= count
             avg_inf /= count
             avg_inf /= 2
-            writer.writerow([key, count, avg_succ, avg_inf])
+            avg_order /= count
+            writer.writerow([key, count, avg_succ, avg_inf, avg_order])
     writer.writerow([])
 
 
@@ -550,7 +642,7 @@ def print_label_counts_with_keys(suffix, server, discussions, normalized):
                     disc_votes[v] = 1
                     first_vote_for_v = True
             if True:#first_vote_for_v:
-                user_activity = len(users_to_contribs[contribs_to_users[contrib_id]])
+                user_activity = users_to_contribs[contribs_to_users[contrib_id]]
                 latest_year, latest_timestamp, vote_labels, keyed_votes = process_votes(server, timestamp_cutoffs, contrib_id, latest_year, i, latest_timestamp, user_activity, vote_labels, keyed_votes)
                 latest_year, latest_timestamp, comment_labels, keyed_comments = process_comments(server, timestamp_cutoffs, contrib_id, latest_year, i, latest_timestamp, user_activity, comment_labels, keyed_comments) 
 
@@ -569,29 +661,6 @@ def print_label_counts_with_keys(suffix, server, discussions, normalized):
     return outcome_labels, vote_labels, comment_labels
 
 
-def get_year(disc_id, timestamp_cutoffs):
-    latest_year = -1
-    code, contribs = server.discussions.get_contributions(disc_id)
-    for contrib_id in contribs:
-        year = -1
-        timestamp = -1
-        if server.util.is_vote(contrib_id):
-            code, timestamp = server.votes.get_timestamp(contrib_id)
-        if server.util.is_comment(contrib_id):
-            code, timestamp = server.comments.get_timestamp(contrib_id)
-        if server.util.is_nomination(contrib_id):
-            code, timestamp = server.nominations.get_timestamp(contrib_id)
-        if timestamp is not None and timestamp > -1:
-            for y in range(2005, 2019):
-                cutoffs = timestamp_cutoffs[y]
-                if cutoffs[0] <= timestamp < cutoffs[1]:
-                    year = y
-            latest_year = max(year, latest_year)
-
-    if latest_year is not None and latest_year > -1:
-        y = latest_year
-        return y
-    return None
 
 def get_strict_discussions(server):
     timestamp_cutoffs = {}
@@ -604,7 +673,7 @@ def get_strict_discussions(server):
     skip_codes = {}
     filtered_discussion_ids = []
     for disc_id in discussion_ids:
-        year = get_year(disc_id, timestamp_cutoffs)
+        year = server.util.get_year(server, disc_id, timestamp_cutoffs)
 
         code, original_contrib_ids = server.discussions.get_contributions(disc_id)
         skip_empty = server.config["strict_discussions"]
@@ -628,7 +697,10 @@ def get_strict_discussions(server):
             if (has_vote and has_out):
                 filtered_discussion_ids.append(disc_id)
             else:
-                c = year
+                if not has_out:
+                    c = "no_out"
+                elif not has_vote:
+                    c = "no_vote"
                 if c not in skip_codes.keys():
                     skip_codes[c] = 0
                 skip_codes[c] = skip_codes[c] + 1
@@ -638,15 +710,15 @@ def get_strict_discussions(server):
         print("   Filtered from {}: {}".format(c, skip_codes[c]))
     return 201, filtered_discussion_ids
 
-
 if __name__ == "__main__":
     normalized = 2
     config = {
-        "extractors": [],
+        "extractors": ["TALLY"],
         "normalized": normalized,
         "strict_discussions": True,
         "source": "afd_2019_full_policies.json"
     }
+
     server = DebateServer(config)
     start = time.time()
     cscw(server, normalized)

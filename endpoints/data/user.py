@@ -207,12 +207,107 @@ class UserEndpoint():
                 return code, None
         except:
             return 500, None
+
+      
+    def put_demographics(self, user_id, demo_map):
+        try:
+            code, user = self.get_by_id(user_id)
+            if "gender" in demo_map:
+                gender = demo_map["gender"]
+                user.gender = gender
+            if "signup" in demo_map:
+                signup = demo_map["signup"]
+                user.signup = signup
+            if "editcount" in demo_map:
+                edits = demo_map["editcount"]
+                user.edits = edits
+            return 200, user_id
+        except:
+            return 500, None
             
+    def get_edit_count(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200:
+                edits = user.edits
+                if edits:
+                    return 200, edits
+            return code, None
+        except:
+            return 500, None
+
+    def get_gender(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200:
+                gender = user.gender
+                if gender:
+                    return 200, gender
+            return code, None
+        except:
+            return 500, None
+            
+    def get_signup(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200:
+                signup = user.signup
+                if signup:
+                    return 200, signup
+            return code, None
+        except:
+            return 500, None 
+        
+    def get_first_contribution(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200 and len(user.contributions) > 0:
+                first_contrib_id, first_contrib_timestamp = user.contributions[0]
+                if first_contrib_id:
+                    return 200, first_contrib_id
+            return 404, None
+        except:
+            return 500, None
+
+    def put_first_discussion(self, user_id, disc_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200:
+                user.first_discussion = disc_id
+                self.users[user_id] = user
+                return 200, user_id
+            return code, None
+        except:
+            return 500, None
+    
+    def get_first_discussion(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200 and user.first_discussion is not None:
+                return 200, user.first_discussion
+            return 404, None
+        except:
+            return 500, None
+
+    def is_registered(self, user_id):
+        try:
+            code, user = self.get_by_id(user_id)
+            if code == 200 and user.signup is not None:
+                registered = user.signup > -1
+                return 200, registered
+            return code, None
+        except:
+            return 500, None
+
 class User:
     def __init__(self, user_json):
         self.id = -1
         self.name = None
+        self.gender = "unknown"
+        self.signup = None
+        self.edits = None
         self.contributions = []
+        self.first_discussion = None
         if "ID" in user_json.keys():
             self.id = user_json["ID"]
         if "Name" in user_json.keys():

@@ -773,8 +773,6 @@ def accuracy_at_points(server):
         csv_out.writerow([key, preserved_influences[key]])
 
 
-
-
 def running_vote_tallies(server):
     code, disc_ids = server.discussions.get_all()
     for disc_id in disc_ids:

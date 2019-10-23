@@ -3,12 +3,12 @@ from scratchpad import dry_run
 import time
 
 if __name__ == "__main__":
-    for i in range(1,21):
+    for i in range(0,20):
         config = {
-            "extractors": ["TALLY"],
+            "extractors": ["TALLY", "BERT"],
             "normalized": 3,
             "strict_discussions": True,
-            "source": "afd_2019_randomized_offset_{}.json".format(i)
+            "source": "jsons/afd_2019_randomized_offset_{}.json".format(i)
         }
         server = DebateServer(config)
         start = time.time()
