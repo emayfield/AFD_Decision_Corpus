@@ -2,6 +2,8 @@
 
 This dataset is a labeled and structured JSON replica of all debates in Wikipedia's *Articles for Deletion* editor debates from January 1, 2005 to December 31, 2018. The total size of the dataset is a bit over 400k total debates, with over 3 million total votes and comments.
 
+**Primary Maintainer Contact**: Elijah Mayfield, elijah@cmu.edu
+
 # Version History and Download Links:
 * Up-To-Date
     - Corpus files are unchanged from version 1.0.
@@ -90,8 +92,22 @@ Each subchild of these four top-level categories represents a single entity in t
         2. Create a new empty folder named `jsons` at the root directory of the project
         3. Download the twenty files in the 0.1 corpus and save them to the `jsons` directory. Each is under 100 MB.
         4. From the root directory, run the command `python3 run.py`. By default this will train new models twenty times, one for each file. 
-        5. To train on only one subset: remove the for loop from `run.py` and change the value pointed at by the `source` key in the config dictionary to the file of your choice. Results in the workshop paper were calculated on subset 1. 
+        5. To train on only one subset: remove the for loop from `run.py` and change the value pointed at by the `source` key in the config dictionary to the file of your choice. 
+        6. Machine learning classification results in the workshop paper were calculated on subset 1. 
 
+# Citing This Corpus
 
+The following Bibtex entry gives the correct citation for this corpus:
 
-This data will be cleaned and made more accessible prior to CSCW 2019.
+```
+@article{mayfield2019,
+    title={Analyzing Wikipedia Deletion Debates with a Group Decision-Making Forecast Model},
+    author={Mayfield, Elijah and Black, Alan W},
+    journal={Proceedings of the ACM on Human-Computer Interaction},
+    volume={3},
+    number={CSCW},
+    pages={206},
+    publisher={ACM}
+    year={2019},
+}}
+```
