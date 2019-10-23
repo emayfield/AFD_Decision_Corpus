@@ -1,6 +1,28 @@
 from datetime import datetime, timedelta
+import requests
+import os
 
 class UtilitiesEndpoint:
+
+    def download_corpus(self, url):
+        local_filename = url.split('/')[-1]
+        # NOTE the stream=True parameter below
+        with requests.get(url, stream=True) as r:
+            r.raise_for_status()
+            with open(f"jsons/{local_filename}", 'wb') as f:
+                row_count = 0
+                col_count = 0
+                for chunk in r.iter_content(chunk_size=8192): 
+                    col_count += 1
+                    if col_count % 125 == 0:
+                        col_count = 0
+                        row_count += 1
+                        print(f"{row_count}MB")
+                    if chunk: # filter out keep-alive new chunks
+                        f.write(chunk)
+                        # f.flush()
+        return f"jsons/{local_filename}"
+
 
     def __init__(self, server):
         self.server = server

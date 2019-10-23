@@ -4,11 +4,22 @@ This dataset is a labeled and structured JSON replica of all debates in Wikipedi
 
 **Primary Maintainer Contact**: Elijah Mayfield, elijah@cmu.edu
 
-# Version History and Download Links:
+# Getting Started
+
+To use this corpus for the first time, we recommend you clone this directory and run the following command:
+
+```
+python3 quickstart.py
+```
+
+This will download the corpus files (not included in the source repository) directly to your hard drive. The size of the total initial download is approximately 1.5GB. Once the corpus file is downloaded, an in-memory Python representation will be constructed; this ensures data integrity. As of October 2019, this takes about a minute on a Macbook Pro.
+
+# Version History and Direct Download Links:
 * Up-To-Date
     - Corpus files are unchanged from version 1.0.
     - The github branch `cscw_cleanup` contains the most recent version of the code for interacting with the corpus. Changes include:
         - BERT representation extraction has been moved to the `pytorch-transformers` library provided by HuggingFace. Previous versions used the `bert-as-service` library released by Han Xiao.
+        - If you are using this code directly from Github without separately downloading the corpus files, they will be downloaded automatically on first run.
 
 * 1.0: https://drive.google.com/open?id=180rKdJeEOVTVanNwGd8dtbsdSg7zR536
     - This is the first full-fledged version of the corpus, used in our CSCW 2019 paper.
@@ -107,7 +118,7 @@ The following Bibtex entry gives the correct citation for this corpus:
     volume={3},
     number={CSCW},
     pages={206},
-    publisher={ACM}
-    year={2019},
+    publisher={ACM},
+    year={2019}
 }}
 ```

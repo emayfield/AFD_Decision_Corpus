@@ -710,7 +710,6 @@ def get_strict_discussions(server):
         print("   Filtered from {}: {}".format(c, skip_codes[c]))
     return 201, filtered_discussion_ids
 
-
 if __name__ == "__main__":
     normalized = 2
     config = {
@@ -719,6 +718,7 @@ if __name__ == "__main__":
         "strict_discussions": True,
         "source": "afd_2019_full_policies.json"
     }
+
     server = DebateServer(config)
     start = time.time()
     cscw(server, normalized)

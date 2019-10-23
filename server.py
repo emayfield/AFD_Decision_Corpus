@@ -12,7 +12,7 @@ from endpoints.data.vote       import VoteEndpoint
 from endpoints.data.comment    import CommentEndpoint
 from endpoints.data.nomination import NominationEndpoint
 from endpoints.helpers.utilities import UtilitiesEndpoint
-from endpoints.helpers.math      import MathEndpoint
+from endpoints.helpers.tally      import MathEndpoint
 from endpoints.helpers.analysis  import AnalysisEndpoint
 from endpoints.learning.instance   import InstanceEndpoint
 from endpoints.learning.vector     import VectorEndpoint
@@ -67,14 +67,29 @@ class DebateServer():
         filename = config["source"]
         start = time.time()
         print("Importing corpus")
-        self.import_corpus(filename)
+        self.import_corpus(filename, load_cached_influences=config["cached_influences"])
         end = time.time()
         print("{:2.2f} seconds elapsed while importing full corpus.".format((end-start)))
 
                                         
     def import_corpus(self, filename, min=0, max=500000, load_cached_influences=True):
+        source_path = os.path.join("jsons")
+        dir_exists = os.path.exists(source_path)
+        if not dir_exists:
+            os.makedirs("jsons")
+        source_path = os.path.join("jsons", filename)
+        if not os.path.isfile(source_path):
+            print("Fetching corpus")
+            
+            if os.path.exists('jsons') and not os.path.isfile('jsons/afd_2019_full_policies.json'):
+                url = 'https://afdcorpus.s3.amazonaws.com/afd_2019_full_policies.json'
+
+                self.util.download_corpus(url)
+
+        else:
+            print("Corpus already downloaded locally.")
         start = time.time()
-        corpus_file = open(filename, "r")
+        corpus_file = open(source_path, "r")
         corpus_json = json.loads(corpus_file.read())
         now = time.time()
         print("{:2.2f} Loaded from JSON.".format((now-start)))
@@ -96,17 +111,19 @@ class DebateServer():
         """
         Load user demographic profiles
         """
-        user_demographics = self.import_user_demographics()
+#       Removed functionality for public release
+        if False:
+            user_demographics = self.import_user_demographics()
 
-        """
-        Post all the users, one at a time
-        """
-        if "Users" in corpus_json.keys():
-            for user in corpus_json["Users"]:
-                code, user_id = self.users.post_user(user)
-                username = user["Name"]
-                if username in user_demographics.keys():
-                    self.users.put_demographics(user_id, user_demographics[username])
+            """
+            Post all the users, one at a time
+            """
+            if "Users" in corpus_json.keys():
+                for user in corpus_json["Users"]:
+                    code, user_id = self.users.post_user(user)
+                    username = user["Name"]
+                    if username in user_demographics.keys():
+                        self.users.put_demographics(user_id, user_demographics[username])
 
 
         now = time.time()
