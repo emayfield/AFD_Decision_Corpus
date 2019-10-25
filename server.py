@@ -1,4 +1,5 @@
 import os, re, csv, json, time, datetime
+import pickle
 from collections import defaultdict
 from endpoints.data.discussion import DiscussionEndpoint
 from endpoints.data.user       import UserEndpoint
@@ -61,11 +62,42 @@ class DebateServer():
         filename = config["source"]
         start = time.time()
         print("Importing corpus")
-        self.import_corpus(filename, load_cached_influences=config["cached_influences"])
+        if os.path.exists("pickles/votes.pickle"):
+            print("Importing from pickles")
+            self.import_from_pickle()
+        else:
+            self.import_corpus(filename, load_cached_influences=config["cached_influences"])
+
+            pickle.dump( self.votes, open( "pickles/votes.pickle", "wb" ) )
+            pickle.dump( self.users, open( "pickles/users.pickle", "wb" ) )
+            pickle.dump( self.discussions, open( "pickles/discussions.pickle", "wb" ) )
+            pickle.dump( self.outcomes, open( "pickles/outcomes.pickle", "wb" ) )
+            pickle.dump( self.comments, open( "pickles/comments.pickle", "wb" ) )
+            pickle.dump( self.nominations, open( "pickles/nominations.pickle", "wb" ) )
         end = time.time()
         print("{:2.2f} seconds elapsed while importing full corpus.".format((end-start)))
 
+    def import_from_pickle(self):
+        if os.path.exists("pickles/votes.pickle"):
+            self.votes = pickle.load(open("votes.pickle", "rb"))
+
+        if os.path.exists("pickles/users.pickle"):
+            self.users = pickle.load(open("users.pickle", "rb"))
+
+        if os.path.exists("pickles/discussions.pickle"):
+            self.discussions = pickle.load(open("discussions.pickle", "rb"))
+
+        if os.path.exists("pickles/outcomes.pickle"):
+            self.outcomes = pickle.load(open("outcomes.pickle", "rb"))
+
+        if os.path.exists("pickles/comments.pickle"):
+            self.comments = pickle.load(open("comments.pickle", "rb"))
+
+        if os.path.exists("pickles/nominations.pickle"):
+            self.nominations = pickle.load(open("nominations.pickle", "rb"))
+
                                         
+
     def import_corpus(self, filename, min=0, max=500000, load_cached_influences=True):
         source_path = os.path.join("jsons")
         dir_exists = os.path.exists(source_path)
