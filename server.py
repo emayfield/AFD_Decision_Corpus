@@ -1,9 +1,4 @@
-import json
-import time
-import os
-import re
-import datetime
-import csv
+import os, re, csv, json, time, datetime
 from collections import defaultdict
 from endpoints.data.discussion import DiscussionEndpoint
 from endpoints.data.user       import UserEndpoint
@@ -12,13 +7,13 @@ from endpoints.data.vote       import VoteEndpoint
 from endpoints.data.comment    import CommentEndpoint
 from endpoints.data.nomination import NominationEndpoint
 from endpoints.helpers.utilities import UtilitiesEndpoint
-from endpoints.helpers.tally      import MathEndpoint
 from endpoints.helpers.analysis  import AnalysisEndpoint
 from endpoints.learning.instance   import InstanceEndpoint
 from endpoints.learning.vector     import VectorEndpoint
 from endpoints.learning.corpus     import CorpusEndpoint
 from endpoints.learning.prediction import PredictionEndpoint
 from endpoints.learning.extractors.tally     import TallyEndpoint
+from endpoints.learning.extractors.volume    import VolumeEndpoint
 from endpoints.learning.extractors.embedding import EmbeddingEndpoint
 from endpoints.learning.extractors.bert      import BertEndpoint, import_bert_cache
 from endpoints.learning.extractors.bow       import BOWEndpoint
@@ -39,9 +34,6 @@ class DebateServer():
 
         # Convenience function endpoints
         self.util = UtilitiesEndpoint(self)
-        self.math = MathEndpoint()
-
-        # Research-enabling endpoints
         self.analysis = AnalysisEndpoint(self)
 
         # Machine Learning endpoints
@@ -55,6 +47,8 @@ class DebateServer():
         extractors = []
         if "TALLY" in extractor_options:
             extractors.append(TallyEndpoint(self))
+        if "VOLUME" in extractor_options:
+            extractors.append(VolumeEndpoint(self))
         if "BOW" in extractor_options:
             extractors.append(BOWEndpoint(self))
         if "BERT" in extractor_options:
@@ -111,23 +105,21 @@ class DebateServer():
         """
         Load user demographic profiles
         """
-#       Removed functionality for public release
-        if False:
-            user_demographics = self.import_user_demographics()
+        user_demographics = self.import_user_demographics()
 
-            """
-            Post all the users, one at a time
-            """
-            if "Users" in corpus_json.keys():
-                for user in corpus_json["Users"]:
-                    code, user_id = self.users.post_user(user)
-                    username = user["Name"]
-                    if username in user_demographics.keys():
-                        self.users.put_demographics(user_id, user_demographics[username])
+        """
+        Post all the users, one at a time
+        """
+        if "Users" in corpus_json.keys():
+            for user in corpus_json["Users"]:
+                code, user_id = self.users.post_user(user)
+                username = user["Name"]
+                if username in user_demographics.keys():
+                    self.users.put_demographics(user_id, user_demographics[username])
 
 
         now = time.time()
-        print("{:2.2f} Posted all users.".format((now-start)))
+        print("{:2.2f} Posted all users and demographics.".format((now-start)))
         start = now
         
         """
@@ -179,7 +171,7 @@ class DebateServer():
                             success = (outcome_label == vote_label)
                             self.votes.put_success(this_id, success)
         now = time.time()
-        print("{:2.2f} Posted all votes and comments.".format((now-start)))
+        print("{:2.2f} Posted all votes, comments, and nominations.".format((now-start)))
         start = now
 
         """
