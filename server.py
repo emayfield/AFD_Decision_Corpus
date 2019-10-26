@@ -23,7 +23,7 @@ class DebateServer():
 
     influence_cache = {}
 
-    def __init__(self, config):
+    def __init__(self, config, use_pickle=False):
         self.config = config
         # Basic data structure endpoints
         self.users = UserEndpoint(self)
@@ -62,39 +62,40 @@ class DebateServer():
         filename = config["source"]
         start = time.time()
         print("Importing corpus")
-        if os.path.exists("pickles/votes.pickle"):
+        if use_pickle and os.path.exists("pickles/votes.pickle"):
             print("Importing from pickles")
             self.import_from_pickle()
         else:
             self.import_corpus(filename, load_cached_influences=config["cached_influences"])
 
-            pickle.dump( self.votes, open( "pickles/votes.pickle", "wb" ) )
-            pickle.dump( self.users, open( "pickles/users.pickle", "wb" ) )
-            pickle.dump( self.discussions, open( "pickles/discussions.pickle", "wb" ) )
-            pickle.dump( self.outcomes, open( "pickles/outcomes.pickle", "wb" ) )
-            pickle.dump( self.comments, open( "pickles/comments.pickle", "wb" ) )
-            pickle.dump( self.nominations, open( "pickles/nominations.pickle", "wb" ) )
+            if use_pickle:
+                pickle.dump( self.votes, open( "pickles/votes.pickle", "wb" ) )
+                pickle.dump( self.users, open( "pickles/users.pickle", "wb" ) )
+                pickle.dump( self.discussions, open( "pickles/discussions.pickle", "wb" ) )
+                pickle.dump( self.outcomes, open( "pickles/outcomes.pickle", "wb" ) )
+                pickle.dump( self.comments, open( "pickles/comments.pickle", "wb" ) )
+                pickle.dump( self.nominations, open( "pickles/nominations.pickle", "wb" ) )
         end = time.time()
         print("{:2.2f} seconds elapsed while importing full corpus.".format((end-start)))
 
     def import_from_pickle(self):
         if os.path.exists("pickles/votes.pickle"):
-            self.votes = pickle.load(open("votes.pickle", "rb"))
+            self.votes = pickle.load(open("pickles/votes.pickle", "rb"))
 
         if os.path.exists("pickles/users.pickle"):
-            self.users = pickle.load(open("users.pickle", "rb"))
+            self.users = pickle.load(open("pickles/users.pickle", "rb"))
 
         if os.path.exists("pickles/discussions.pickle"):
-            self.discussions = pickle.load(open("discussions.pickle", "rb"))
+            self.discussions = pickle.load(open("pickles/discussions.pickle", "rb"))
 
         if os.path.exists("pickles/outcomes.pickle"):
-            self.outcomes = pickle.load(open("outcomes.pickle", "rb"))
+            self.outcomes = pickle.load(open("pickles/outcomes.pickle", "rb"))
 
         if os.path.exists("pickles/comments.pickle"):
-            self.comments = pickle.load(open("comments.pickle", "rb"))
+            self.comments = pickle.load(open("pickles/comments.pickle", "rb"))
 
         if os.path.exists("pickles/nominations.pickle"):
-            self.nominations = pickle.load(open("nominations.pickle", "rb"))
+            self.nominations = pickle.load(open("pickles/nominations.pickle", "rb"))
 
                                         
 
@@ -147,6 +148,7 @@ class DebateServer():
                 code, user_id = self.users.post_user(user)
                 username = user["Name"]
                 if username in user_demographics.keys():
+                    print(f"Adding user demographics for {user_id}")
                     self.users.put_demographics(user_id, user_demographics[username])
 
 
