@@ -148,7 +148,6 @@ class DebateServer():
                 code, user_id = self.users.post_user(user)
                 username = user["Name"]
                 if username in user_demographics.keys():
-                    print(f"Adding user demographics for {user_id}")
                     self.users.put_demographics(user_id, user_demographics[username])
 
 

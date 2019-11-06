@@ -10,22 +10,16 @@ class SurvivalAnalysis():
     def key(self, details):
         keyA = "unknown"
         gender = ""
-        first_time = ""
-        enfranchised = ""
+        first_time = "newcomer" if "first_time" in details.keys() and details["first_time"] else "veteran"
+        enfranchised = "wikipedian" if "enfranchised" in details.keys() and details["enfranchised"] else "amateur"
         tenure_at = "UNK"
         if "tenure_at" in details.keys():
             tenure_at = details["tenure_at"]
+            if tenure_at > 100:
+                tenure_at = ">100"
         if "gender" in details.keys():
             gender = details["gender"]
-        if "first_time" in details.keys():
-            if details["first_time"]:
-                first_time = "newcomer"
-            else:
-                first_time = "veteran"
-        if "enfranchised" in details.keys():
-            if details["enfranchised"]:
-                enfranchised = "Wikipedian"
-        keyA = f"{gender} {enfranchised} {tenure_at}"
+        keyA = [gender, enfranchised, tenure_at]
         return keyA
 
     def run(self, server, normalized):
@@ -43,29 +37,48 @@ class SurvivalAnalysis():
 
             user_participation = defaultdict(lambda: [])
             for i, contrib_id in enumerate(contrib_ids):
-                code, user_id = server.util.get_user_id(contrib_id)
-                user_participation[user_id].append(contrib_id)
+                code, user = server.util.get_user_id(contrib_id)
+                user_participation[user].append(contrib_id)
             for user in user_participation:
                 all_user_contribs[user].append(user_participation[user])
 
+        dropouts = 0
+        non_dropouts = 0
+        key_strings = {}
         for user in all_user_contribs.keys():
-            details = generate_single_profile(server, user_id)
-            this_user_lifetime = server.users.get_contributions(user)
-            last_contrib_id = this_user_lifetime[-1]
-            for i, discussion_set in enumerate(all_user_contribs[user]):
-                local_details = details.copy()
-                success = check_success(server, discussion_set)
-                dropout = last_contrib_id in discussion_set
-                min_tenure = 99999999
-                for contrib in discussion_set:
-                    if contrib in this_user_lifetime:
-                        ix = this_user_lifetime.index(contrib)
-                        min_tenure = min(ix, min_tenure)
-                if min_tenure < 99999999:
-                    details["tenure_at"] = min_tenure
-                key = self.key(details)
-                bucketed_success_log[key].append(success)
-                bucketed_dropout_log[key].append(dropout)
+            details = generate_single_profile(server, user)
+            code, this_user_lifetime = server.users.get_contributions(user)
+            if this_user_lifetime is None or len(this_user_lifetime) == 0:
+                code, name = server.users.get_name(user)
+                print(f"User {user} name {name} has no history.")
+            else:
+                last_contrib_id = this_user_lifetime[-1]
+                for i, discussion_set in enumerate(all_user_contribs[user]):
+                    local_details = details.copy()
+                    success = check_success(server, discussion_set)
 
-        summarize_log(bucketed_dropout_log)
-        summarize_log(bucketed_dropout_log)
+                    # These next two things not currently being calculated properly:
+                    # Tenure at post i
+                    # Dropout vs. stay
+                    dropout = last_contrib_id in discussion_set
+                    if dropout:
+                        dropouts += 1
+                    else:
+                        non_dropouts += 1
+                        
+                    min_tenure = 99999999
+                    for contrib in discussion_set:
+                        if contrib in this_user_lifetime:
+                            ix = this_user_lifetime.index(contrib)
+                            min_tenure = min(ix, min_tenure)
+                    if min_tenure < 99999999:
+                        details["tenure_at"] = min_tenure
+
+                    # Code works fine from this point forward.
+                    key_list = self.key(details)
+                    bucketed_success_log[str(key_list)].append(success)
+                    bucketed_dropout_log[str(key_list)].append(dropout)
+                    key_strings[str(key_list)] = key_list
+
+        summarize_log("dropout", key_strings, bucketed_dropout_log)
+        summarize_log("success", key_strings, bucketed_success_log)

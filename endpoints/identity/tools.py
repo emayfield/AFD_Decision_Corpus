@@ -1,3 +1,5 @@
+import csv
+
 def get_examples(server, normalized=2, vote_pattern=None, cite=None):
     code, discussions = server.discussions.get_all()
     if code == 200:
@@ -121,8 +123,12 @@ def cume_shift(server, contribs):
             cume_inf += influence
     return max_success > 0
 
-def summarize_log(log):
+def summarize_log(filename, key_strings, log):
     rates = {}
+
+    csv_writer = csv.writer(open(f"survival_{filename}.csv", "w"))
+    header = ["gender", "enfranchised", "tenure", "positive", "total", "rate"]
+    csv_writer.writerow(header)
     for key in log:
         positive = 0
         total = 0
@@ -131,7 +137,10 @@ def summarize_log(log):
                 positive += 1
             total += 1
         rate = (positive/total)
-        print(f"{key} {positive} / {total} = {rate}")
+
+        row_key = key_strings[key]
+        row_key.extend([positive, total, rate])
+        csv_writer.writerow(row_key)
         rates[key] = rate
     return rates
 
