@@ -18,7 +18,6 @@ This will download the corpus files (not included in the source repository) dire
 
 * **Alternate Pandas Direct Download:** 
     - If you do not want to replicate results and simply want the data in a maximally convenient form, you can get dataframes ready to load with Pandas `read_csv()` at: https://afdcorpus.s3.amazonaws.com/pandas_afd.zip
-    - 
     
 * Up-To-Date
     - Corpus files are unchanged from version 1.0.
