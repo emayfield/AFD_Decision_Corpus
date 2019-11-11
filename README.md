@@ -15,6 +15,11 @@ python3 quickstart.py
 This will download the corpus files (not included in the source repository) directly to your hard drive. The size of the total initial download is approximately 1.5GB. Once the corpus file is downloaded, an in-memory Python representation will be constructed; this ensures data integrity. As of October 2019, this takes about a minute on a Macbook Pro.
 
 # Version History and Direct Download Links:
+
+* **Alternate Pandas Direct Download:** 
+    - If you do not want to replicate results and simply want the data in a maximally convenient form, you can get dataframes ready to load with Pandas `read_csv()` at: https://afdcorpus.s3.amazonaws.com/pandas_afd.zip
+    - 
+    
 * Up-To-Date
     - Corpus files are unchanged from version 1.0.
     - The github branch `cscw_cleanup` contains the most recent version of the code for interacting with the corpus. Changes include:
