@@ -69,7 +69,7 @@ singledispatch==3.4.0.3
 six==1.11.0
 spacy==2.0.17
 tensorboard==1.12.2
-tensorflow==1.13.0rc2
+tensorflow==2.7.2
 tensorflow-estimator==1.13.0
 termcolor==1.1.0
 thinc==6.12.0
