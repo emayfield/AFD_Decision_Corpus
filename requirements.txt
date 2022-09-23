@@ -49,7 +49,7 @@ pbr==5.1.2
 plac==0.9.6
 pluggy==0.8.0
 preshed==2.0.1
-protobuf==3.6.1
+protobuf==3.18.3
 py==1.7.0
 pylint==2.1.1
 pyparsing==2.3.0
